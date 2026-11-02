@@ -4,9 +4,9 @@ class Masters::ItToolSettingsController < ApplicationController
   before_action { raise CanCan::AccessDenied, "Only admin can change IT Tools settings" unless current_user.admin? }
 
   FIELDS = {
-    "KRA_PORTAL_URL"    => [ "Key Result portal address", "https://kra.asaindia.org" ],
+    "KRA_PORTAL_URL"    => [ "Key Result portal address", "http://kra.pgplindia.co.in" ],
     "KRA_SSO_SECRET"    => [ "Key Result secret (ESS_SSO_SECRET on the Key Result server)", nil ],
-    "OLD_ESS_URL"        => [ "Old ESS address", "https://ess.asaindia.org" ],
+    "OLD_ESS_URL"        => [ "Old ESS address", "https://ess.asaindia.org/pgpl" ],
     "OLD_ESS_SSO_SECRET" => [ "Old ESS secret (same value inside ess_sso.php on the old ESS) – blank = old ESS opens its login page", nil ]
   }.freeze
 

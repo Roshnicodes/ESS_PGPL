@@ -70,15 +70,15 @@ class ItToolsTest < ActionDispatch::IntegrationTest
   end
 
   test "Old ESS: login page until its secret is set, then a signed link ess_sso.php checks" do
-    ENV["OLD_ESS_SSO_SECRET"] = nil
+    ENV["OLD_ESS_SSO_SECRET"] = nil; ENV["OLD_ESS_URL"] = nil
     sign_in @emp
     get it_tool_path("old_ess")
-    assert_redirected_to "https://ess.asaindia.org/"
+    assert_redirected_to "https://ess.asaindia.org/pgpl/"
     ENV["OLD_ESS_SSO_SECRET"] = "old-secret"
     get it_tool_path("old_ess")
     uri = URI.parse(response.location)
     q = URI.decode_www_form(uri.query).to_h
-    assert_equal [ "ess.asaindia.org", "/ess_sso.php" ], [ uri.host, uri.path ]
+    assert_equal [ "ess.asaindia.org", "/pgpl/ess_sso.php" ], [ uri.host, uri.path ]
     assert_equal @emp.emp_code, q["emp_code"]
     # old_ess_sso/ess_sso.php: hash_hmac('sha256', "$emp_code:$expires_at", secret)
     assert_equal OpenSSL::HMAC.hexdigest("SHA256", "old-secret", "#{@emp.emp_code}:#{q['expires_at']}"), q["signature"]

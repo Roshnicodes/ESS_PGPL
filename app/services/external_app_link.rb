@@ -23,8 +23,8 @@ class ExternalAppLink
   def self.label(key) = TOOLS.dig(key.to_s, :label)
 
   # Admin sets these in Masters → IT Tools Settings (ENV variables, if present, take priority)
-  def self.kra_url    = (AppSetting.get("KRA_PORTAL_URL").presence || "https://kra.asaindia.org").chomp("/")
-  def self.old_ess_url = (AppSetting.get("OLD_ESS_URL").presence || "https://ess.asaindia.org").chomp("/")
+  def self.kra_url    = (AppSetting.get("KRA_PORTAL_URL").presence || "http://kra.pgplindia.co.in").chomp("/")
+  def self.old_ess_url = (AppSetting.get("OLD_ESS_URL").presence || "https://ess.asaindia.org/pgpl").chomp("/")
 
   SECRET_SETTING = { kra: "KRA_SSO_SECRET", old_ess: "OLD_ESS_SSO_SECRET" }.freeze
 
