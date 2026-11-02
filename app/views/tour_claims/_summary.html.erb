@@ -37,7 +37,7 @@
   <% lines = claim.public_send(assoc) %>
   <% next if lines.empty? %>
   <div class="card mb-4 overflow-hidden" data-review-section>
-    <div class="card-head"><span class="card-title text-sm"><%= title %></span><span class="text-sm text-slate-500">Sub total <b class="ml-1 text-slate-900" data-review-sub><%= inr(claim.public_send(TourClaim::SECTIONS[assoc])) %></b></span></div>
+    <div class="card-head"><span class="card-title text-sm"><%= title %></span></div>
     <%# one line per expense: fixed table fits the width (text wraps inside cells) – no sideways scroll %>
     <table class="tbl tbl-review xl:table-fixed">
       <thead><tr><% heads.each do |h| %><th><%= h %></th><% end %>
@@ -45,7 +45,7 @@
       <tbody>
         <% if f %><%= f.fields_for(assoc) do |lf| %><% l = lf.object %>
           <tr data-review-row data-amount="<%= l.amount.to_d %>">
-            <% cells.(l).each_with_index do |c, i| %><td data-label="<%= heads[i] %>" class="[overflow-wrap:anywhere]"><%= c.presence || "—" %></td><% end %>
+            <% cells.(l).each_with_index do |c, i| %><td data-label="<%= heads[i] %>" class="[overflow-wrap:anywhere] print:[overflow-wrap:break-word]"><%= c.presence || "—" %></td><% end %>
             <td data-label="Amount" class="md:text-right"><%= inr(l.amount) %></td>
             <td data-label="Deduction"><%= lf.number_field :deduction_amount, step: "0.01", min: 0, max: l.amount, value: (l.deduction_amount.to_d.zero? ? nil : l.deduction_amount), placeholder: "0.00", class: "inp px-2 text-right", data: { review_deduction: true, action: "input->review-calc#recalc" } %></td>
             <td data-label="Deduction Remark"><%= lf.text_field :deduction_remark, class: "inp px-2", placeholder: "Reason" %></td>
@@ -55,7 +55,7 @@
         <% unless f %>
           <% lines.each do |l| %>
             <tr data-review-row data-amount="<%= l.amount.to_d %>">
-              <% cells.(l).each_with_index do |c, i| %><td data-label="<%= heads[i] %>" class="[overflow-wrap:anywhere]"><%= c.presence || "—" %></td><% end %>
+              <% cells.(l).each_with_index do |c, i| %><td data-label="<%= heads[i] %>" class="[overflow-wrap:anywhere] print:[overflow-wrap:break-word]"><%= c.presence || "—" %></td><% end %>
               <td data-label="Amount" class="md:text-right"><%= inr(l.amount) %></td>
               <td data-label="Deduction"><%= l.deduction_amount.to_d.positive? ? tag.span("−#{inr(l.deduction_amount)}", class: "font-semibold text-rose-600") : "—" %></td>
               <td data-label="Deduction Remark" class="break-words"><%= l.deduction_remark.presence || "—" %></td>
@@ -65,6 +65,8 @@
         <% end %>
       </tbody>
     </table>
+    <%# sub total sits under the section's rows (screen and print) %>
+    <div class="flex justify-end border-t border-slate-200 bg-slate-50/70 px-4 py-2 text-sm text-slate-600 sm:px-5">Sub total <b class="ml-2 text-slate-900" data-review-sub><%= inr(claim.public_send(TourClaim::SECTIONS[assoc])) %></b></div>
   </div>
 <% end %>
 
@@ -76,7 +78,7 @@
   <span>Grand total <b class="ml-1 text-lg text-slate-900" data-review-grand><%= inr(claim.grand_total) %></b></span>
   <span class="text-slate-500">− Advance <b class="ml-1 text-slate-700"><%= inr(claim.advance_amount) %></b></span>
   <span class="rounded-lg bg-brand-600 px-3 py-1 text-white">Balance <b class="ml-1 text-lg" data-review-balance><%= inr(claim.balance_amount) %></b></span>
-  <% if claim.general_description.present? %><span class="min-w-0 flex-1 truncate text-slate-600" title="<%= claim.general_description %>"><span class="text-xs font-semibold uppercase text-slate-400">Description</span> <%= claim.general_description %></span><% end %>
+  <% if claim.general_description.present? %><span class="min-w-0 flex-1 truncate text-slate-600 print:overflow-visible print:whitespace-normal" title="<%= claim.general_description %>"><span class="text-xs font-semibold uppercase text-slate-400">Description</span> <%= claim.general_description %></span><% end %>
   <% if claim.two_wheeler_used? %><span class="flex items-center gap-1 text-xs"><%= icon(claim.helmet_declaration? ? :check_circle : :x_circle, "h-4 w-4 #{claim.helmet_declaration? ? 'text-emerald-500' : 'text-rose-500'}") %>Helmet declaration</span><% end %>
 </div>
 

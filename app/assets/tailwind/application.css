@@ -230,6 +230,17 @@
   .tbl-stack tbody td::before, .tbl-review tbody td::before { display: none !important; content: none !important; }
   /* paper carries no action controls – only the record itself */
   .no-print, .tbl .no-print, .tbl-stack .no-print, .tbl-review .no-print { display: none !important; }
+  /* wide claim tables must fit the A4 width at 100% scale: shrink text, let every cell (and header) wrap,
+     never clip the card, and print deduction inputs as plain values */
+  .card:has(> .tbl-review), .card:has(> .tbl-stack), .card:has(.tbl-review), .overflow-x-auto { overflow: visible !important; }
+  .tbl-stack, .tbl-review { max-width: 100% !important; }
+  .tbl-stack td, .tbl-review td { overflow-wrap: break-word !important; word-break: normal !important; min-width: 0 !important; }
+  .tbl-stack th, .tbl-review th { overflow-wrap: anywhere !important; word-break: normal !important; min-width: 0 !important; }
+  .tbl-review th, .tbl-review td, .tbl-stack th, .tbl-stack td { padding: 3px 4px !important; font-size: 9.5px !important; }
+  .tbl-review th, .tbl-stack th { font-size: 8.5px !important; letter-spacing: 0 !important; }
+  .tbl-review .inp, .tbl-stack .inp { border: 0 !important; box-shadow: none !important; background: none !important; padding: 0 !important;
+    width: 100% !important; min-width: 0 !important; height: auto !important; min-height: 0 !important; font-size: 9.5px !important; }
+  .tbl-review .inp::placeholder, .tbl-stack .inp::placeholder { color: transparent !important; }
   .seal-foot { margin: 0 0 -14px; padding-right: .5rem; }
   .print-only { display: block !important; }
 }
