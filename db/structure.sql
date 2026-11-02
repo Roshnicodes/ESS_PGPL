@@ -257,7 +257,7 @@ CREATE TABLE public.bank_accounts (
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_bank_accounts_ifsc CHECK (((ifsc_code)::text ~ '^[A-Z]{4}0[A-Z0-9]{6}$'::text)),
     CONSTRAINT chk_bank_accounts_number CHECK (((account_number)::text ~ '^[0-9]{6,20}$'::text)),
-    CONSTRAINT chk_bank_accounts_type CHECK (((account_type)::text = ANY ((ARRAY['savings'::character varying, 'current'::character varying])::text[])))
+    CONSTRAINT chk_bank_accounts_type CHECK (((account_type)::text = ANY (ARRAY[('savings'::character varying)::text, ('current'::character varying)::text])))
 );
 
 
@@ -440,7 +440,7 @@ CREATE TABLE public.claim_city_travels (
     updated_at timestamp(6) without time zone NOT NULL,
     ticket_quota character varying(10) DEFAULT 'normal'::character varying NOT NULL,
     CONSTRAINT chk_claim_city_travels_amounts CHECK (((amount >= (0)::numeric) AND (deduction_amount >= (0)::numeric) AND (deduction_amount <= amount))),
-    CONSTRAINT chk_claim_city_travels_quota CHECK (((ticket_quota)::text = ANY ((ARRAY['normal'::character varying, 'tatkal'::character varying])::text[]))),
+    CONSTRAINT chk_claim_city_travels_quota CHECK (((ticket_quota)::text = ANY (ARRAY[('normal'::character varying)::text, ('tatkal'::character varying)::text]))),
     CONSTRAINT chk_claim_city_travels_total CHECK ((total_amount = (amount - deduction_amount)))
 );
 
@@ -701,7 +701,7 @@ CREATE TABLE public.claim_queries (
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT chk_claim_queries_answer CHECK (((answered_at IS NULL) OR (length(btrim(COALESCE(answer, ''::text))) > 0))),
     CONSTRAINT chk_claim_queries_question CHECK ((length(btrim(question)) > 0)),
-    CONSTRAINT chk_claim_queries_role CHECK (((asked_to_role)::text = ANY ((ARRAY['l1'::character varying, 'l2'::character varying])::text[])))
+    CONSTRAINT chk_claim_queries_role CHECK (((asked_to_role)::text = ANY (ARRAY[('l1'::character varying)::text, ('l2'::character varying)::text])))
 );
 
 
@@ -1037,15 +1037,15 @@ CREATE TABLE public.tour_claims (
     bank_account_id bigint,
     extra_approver_id bigint,
     CONSTRAINT chk_claims_advance_positive CHECK ((advance_amount >= (0)::numeric)),
-    CONSTRAINT chk_claims_finance_coding_on_approval CHECK ((((status)::text <> 'approved'::text) OR ((project_id IS NOT NULL) AND (budget_line_item_id IS NOT NULL) AND (budget_line_item_code_id IS NOT NULL) AND (approved_at IS NOT NULL)))),
+    CONSTRAINT chk_claims_approved_at_on_approval CHECK ((((status)::text <> 'approved'::text) OR (approved_at IS NOT NULL))),
     CONSTRAINT chk_claims_l1 CHECK ((((status)::text <> 'l1_approved'::text) OR ((l1_approved_at IS NOT NULL) AND (l2_approver_id IS NOT NULL)))),
     CONSTRAINT chk_claims_reject_remark CHECK ((((status)::text <> 'rejected'::text) OR (length(btrim(COALESCE(reject_remark, ''::text))) > 0))),
     CONSTRAINT chk_claims_return_remark CHECK ((((status)::text <> 'returned'::text) OR ((returned_at IS NOT NULL) AND (length(btrim(COALESCE(return_remark, ''::text))) > 0)))),
     CONSTRAINT chk_claims_submitted_l1 CHECK ((((status)::text <> 'submitted'::text) OR (l1_approver_id IS NOT NULL))),
-    CONSTRAINT chk_claims_type CHECK (((claim_type)::text = ANY ((ARRAY['tour'::character varying, 'local'::character varying])::text[]))),
+    CONSTRAINT chk_claims_type CHECK (((claim_type)::text = ANY (ARRAY[('tour'::character varying)::text, ('local'::character varying)::text]))),
     CONSTRAINT chk_tour_claims_delete_remark CHECK (((deleted_at IS NULL) OR (length(btrim(COALESCE(delete_remark, ''::text))) > 0))),
     CONSTRAINT chk_tour_claims_extra_pointer CHECK ((((status)::text <> 'extra_pending'::text) OR (extra_approver_id IS NOT NULL))),
-    CONSTRAINT chk_tour_claims_status CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'submitted'::character varying, 'l1_approved'::character varying, 'extra_pending'::character varying, 'finance_pending'::character varying, 'finance_query'::character varying, 'approved'::character varying, 'returned'::character varying, 'rejected'::character varying, 'cancelled'::character varying])::text[])))
+    CONSTRAINT chk_tour_claims_status CHECK (((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('submitted'::character varying)::text, ('l1_approved'::character varying)::text, ('extra_pending'::character varying)::text, ('finance_pending'::character varying)::text, ('finance_query'::character varying)::text, ('approved'::character varying)::text, ('returned'::character varying)::text, ('rejected'::character varying)::text, ('cancelled'::character varying)::text])))
 );
 
 
@@ -1084,7 +1084,7 @@ CREATE TABLE public.tour_visits (
     updated_at timestamp(6) without time zone NOT NULL,
     ticket_quota character varying(10) DEFAULT 'normal'::character varying NOT NULL,
     CONSTRAINT chk_tour_visits_activity_len CHECK ((char_length(planned_activity) <= 500)),
-    CONSTRAINT chk_tour_visits_quota CHECK (((ticket_quota)::text = ANY ((ARRAY['normal'::character varying, 'tatkal'::character varying])::text[])))
+    CONSTRAINT chk_tour_visits_quota CHECK (((ticket_quota)::text = ANY (ARRAY[('normal'::character varying)::text, ('tatkal'::character varying)::text])))
 );
 
 
@@ -1159,9 +1159,9 @@ CREATE TABLE public.tours (
     CONSTRAINT chk_tours_reject_remark CHECK ((((status)::text <> 'rejected'::text) OR (length(btrim(COALESCE(decision_remark, ''::text))) > 0))),
     CONSTRAINT chk_tours_rejected_at CHECK ((((status)::text <> 'rejected'::text) OR (rejected_at IS NOT NULL))),
     CONSTRAINT chk_tours_return_remark CHECK ((((status)::text <> 'returned'::text) OR ((returned_at IS NOT NULL) AND (length(btrim(COALESCE(return_remark, ''::text))) > 0)))),
-    CONSTRAINT chk_tours_status CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'submitted'::character varying, 'l1_approved'::character varying, 'l2_approved'::character varying, 'approved'::character varying, 'returned'::character varying, 'rejected'::character varying, 'cancelled'::character varying])::text[]))),
+    CONSTRAINT chk_tours_status CHECK (((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('submitted'::character varying)::text, ('l1_approved'::character varying)::text, ('l2_approved'::character varying)::text, ('approved'::character varying)::text, ('returned'::character varying)::text, ('rejected'::character varying)::text, ('cancelled'::character varying)::text]))),
     CONSTRAINT chk_tours_submitted_at CHECK ((((status)::text = 'draft'::text) OR ((status)::text = 'cancelled'::text) OR (submitted_at IS NOT NULL))),
-    CONSTRAINT chk_tours_type CHECK (((tour_type)::text = ANY ((ARRAY['tour'::character varying, 'local'::character varying])::text[])))
+    CONSTRAINT chk_tours_type CHECK (((tour_type)::text = ANY (ARRAY[('tour'::character varying)::text, ('local'::character varying)::text])))
 );
 
 
@@ -1196,7 +1196,7 @@ CREATE TABLE public.travel_mode_approvers (
     "position" integer DEFAULT 1 NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT chk_travel_mode_approvers_kind CHECK (((kind)::text = ANY ((ARRAY['approve'::character varying, 'notify'::character varying, 'tatkal'::character varying])::text[])))
+    CONSTRAINT chk_travel_mode_approvers_kind CHECK (((kind)::text = ANY (ARRAY[('approve'::character varying)::text, ('notify'::character varying)::text, ('tatkal'::character varying)::text])))
 );
 
 
@@ -1240,7 +1240,7 @@ CREATE TABLE public.travel_modes (
     manual_total boolean DEFAULT false NOT NULL,
     extra_approver_id bigint,
     is_train boolean DEFAULT false NOT NULL,
-    CONSTRAINT chk_travel_modes_category CHECK (((category)::text = ANY ((ARRAY['own_vehicle'::character varying, 'public'::character varying, 'office'::character varying, 'none'::character varying])::text[])))
+    CONSTRAINT chk_travel_modes_category CHECK (((category)::text = ANY (ARRAY[('own_vehicle'::character varying)::text, ('public'::character varying)::text, ('office'::character varying)::text, ('none'::character varying)::text])))
 );
 
 
@@ -1300,7 +1300,7 @@ CREATE TABLE public.users (
     finance_approver_id bigint,
     CONSTRAINT chk_users_not_own_l2 CHECK (((l2_manager_id IS NULL) OR (l2_manager_id <> id))),
     CONSTRAINT chk_users_not_own_manager CHECK (((reporting_manager_id IS NULL) OR (reporting_manager_id <> id))),
-    CONSTRAINT chk_users_role CHECK (((role)::text = ANY ((ARRAY['employee'::character varying, 'mis'::character varying, 'pd_hr'::character varying, 'pd_finance'::character varying, 'admin'::character varying])::text[])))
+    CONSTRAINT chk_users_role CHECK (((role)::text = ANY (ARRAY[('employee'::character varying)::text, ('mis'::character varying)::text, ('pd_hr'::character varying)::text, ('pd_finance'::character varying)::text, ('admin'::character varying)::text])))
 );
 
 
@@ -1690,7 +1690,7 @@ ALTER TABLE ONLY public.claim_visit_reports
 --
 
 ALTER TABLE ONLY public.tours
-    ADD CONSTRAINT excl_tours_no_overlap EXCLUDE USING gist (user_id WITH =, daterange(from_date, to_date, '[]'::text) WITH &&) WHERE ((((tour_type)::text = 'tour'::text) AND ((status)::text = ANY ((ARRAY['submitted'::character varying, 'l1_approved'::character varying, 'l2_approved'::character varying, 'approved'::character varying])::text[])) AND (deleted_at IS NULL)));
+    ADD CONSTRAINT excl_tours_no_overlap EXCLUDE USING gist (user_id WITH =, daterange(from_date, to_date, '[]'::text) WITH &&) WHERE ((((tour_type)::text = 'tour'::text) AND ((status)::text = ANY (ARRAY[('submitted'::character varying)::text, ('l1_approved'::character varying)::text, ('l2_approved'::character varying)::text, ('approved'::character varying)::text])) AND (deleted_at IS NULL)));
 
 
 --
@@ -1934,7 +1934,7 @@ CREATE INDEX idx_tours_l3_queue ON public.tours USING btree (l3_approver_id, sta
 -- Name: idx_tours_one_live_local_claim_per_month; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_tours_one_live_local_claim_per_month ON public.tours USING btree (user_id, claim_month) WHERE (((tour_type)::text = 'local'::text) AND ((status)::text = ANY ((ARRAY['submitted'::character varying, 'l1_approved'::character varying, 'approved'::character varying])::text[])) AND (deleted_at IS NULL));
+CREATE UNIQUE INDEX idx_tours_one_live_local_claim_per_month ON public.tours USING btree (user_id, claim_month) WHERE (((tour_type)::text = 'local'::text) AND ((status)::text = ANY (ARRAY[('submitted'::character varying)::text, ('l1_approved'::character varying)::text, ('approved'::character varying)::text])) AND (deleted_at IS NULL));
 
 
 --
@@ -3266,6 +3266,7 @@ ALTER TABLE ONLY public.projects
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261102100001'),
 ('20261030160001'),
 ('20261030120001'),
 ('20261030110001'),

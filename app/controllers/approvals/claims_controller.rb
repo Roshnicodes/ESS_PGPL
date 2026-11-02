@@ -61,9 +61,7 @@ class Approvals::ClaimsController < ApplicationController
   def approve
     authorize! :review, @claim
     remark = remark!
-    TourClaim.transaction { save_deductions!; @claim.approve!(by: current_user, remark: remark,
-      project_id: params[:project_id], budget_line_item_id: params[:budget_line_item_id],
-      budget_line_item_code_id: params[:budget_line_item_code_id]) }
+    TourClaim.transaction { save_deductions!; @claim.approve!(by: current_user, remark: remark) }
     redirect_to approvals_claims_path(type: @claim.claim_type), notice: "Claim approved."
   rescue ActiveRecord::RecordInvalid
     render_review_again
