@@ -1,7 +1,7 @@
-# ASA ESS mail page for krai
+# PGPL ESS mail page for krai
 
-ASA ESS (https://hr.asaindia.org – Tour Plan, TA/DA claim, Local Mileage) sends every
-notification as an email through **one krai page, `ess_notification.aspx`** – the same way
+PGPL ESS (https://hr.asaindia.org/pgpl – Tour Plan, TA/DA claim, Local Mileage) sends every
+notification as an email through **one krai page, `pgpless_notification.aspx`** – the same way
 Apurti (`nemail.aspx`) and the KRA portal (`asakra_notification.aspx`) already use krai.
 The ESS server calls the page with GET parameters; the page sends one HTML mail to `to_email`.
 `mail_type` tells the page which mail it is (heading, colour, button).
@@ -10,13 +10,13 @@ The ESS server calls the page with GET parameters; the page sends one HTML mail 
 
 | File | What it is |
 | --- | --- |
-| `ess_notification.aspx` | The one page the ESS server calls |
+| `pgpless_notification.aspx` | The one page the ESS server calls |
 | `App_Code/EssMail.cs` | Builds the HTML mail and sends it |
 | `web.config.sample` | Settings to merge into krai's `web.config` |
 
 ## Setup
 
-1. Copy `ess_notification.aspx` to the krai site root (next to `nemail.aspx` / `asakra_notification.aspx`).
+1. Copy `pgpless_notification.aspx` to the krai site root (next to `nemail.aspx` / `asakra_notification.aspx`).
 2. Copy `App_Code/EssMail.cs` to the site's `App_Code` folder.
    In a Web Application project (not a Web Site), add it to the project with Build Action = Compile and rebuild.
 3. Merge `web.config.sample` into krai's `web.config`: SMTP details (the same notification mail id / SMTP
@@ -31,14 +31,14 @@ The ESS server calls the page with GET parameters; the page sends one HTML mail 
 reviewer_role, reviewer_name, action, remarks, mail_type`
 
 - `to_email` is required; the others may be empty (`quarter` and `month` are always empty for ESS).
-- `subject` is the mail subject (starts with "ASA ESS:").
+- `subject` is the mail subject (starts with "PGPL ESS:").
 - `message` is the main text; it already contains the tour reference, tour dates / local-mileage month and
   claim amount, e.g. `… Ref: TR-2026-000017 | Tour Plan 23/10/2026 to 27/10/2026 | Claim amount: Rs. 1012.50`.
 - `reviewer_name` = the person who did the action, `reviewer_role` = Employee / Approver.
 - `action` = pending, forwarded, approved, returned, rejected, cancelled, deleted, closed or information
   (please accept all of these – do not limit it to pending/approved/rejected).
 - `remarks` = the remark written by the approver / Finance (may be empty).
-- `link` becomes a button. It must start with `https://hr.asaindia.org`.
+- `link` becomes a button. It must start with `https://hr.asaindia.org/pgpl`.
 - All values are HTML-encoded. The page writes the "Dear <to_name>," greeting itself.
 
 ## mail_type values
@@ -81,12 +81,12 @@ The ESS server treats anything other than 200 with `"success":true` as a failure
 Open in a browser after putting your own email in place of `YOUR_EMAIL` (more links in `ESS_krai_test_links.txt`):
 
 ```
-https://krai.asaindia.org/ess_notification.aspx?to_email=YOUR_EMAIL%40asabhopal.org&to_name=Sharad+Saxena&subject=ASA+ESS%3A+Tour+for+your+approval+%28L1%29&message=Roshni+Tiwari+sent+Tour+plan+%2823%2F10%2F2026+to+27%2F10%2F2026%29.+Ref%3A+TR-2026-000017+%7C+Tour+Plan+23%2F10%2F2026+to+27%2F10%2F2026&link=https%3A%2F%2Fhr.asaindia.org%2Fapprovals%2Ftours%2F17&employee_name=Roshni+Tiwari&employee_code=1752&quarter=&month=&reviewer_role=Employee&reviewer_name=Roshni+Tiwari&action=pending&remarks=&mail_type=tour_pending
+https://krai.asaindia.org/pgplpgpless_notification.aspx?to_email=YOUR_EMAIL%40pgplindia.co.in&to_name=Rajesh+Kumar&subject=PGPL+ESS%3A+Tour+for+your+approval+%28L1%29&message=Priya+Sharma+sent+Tour+plan+%2823%2F10%2F2026+to+27%2F10%2F2026%29.+Ref%3A+TR-2026-000017+%7C+Tour+Plan+23%2F10%2F2026+to+27%2F10%2F2026&link=https%3A%2F%2Fhr.asaindia.org/pgpl%2Fapprovals%2Ftours%2F17&employee_name=Priya+Sharma&employee_code=1752&quarter=&month=&reviewer_role=Employee&reviewer_name=Priya+Sharma&action=pending&remarks=&mail_type=tour_pending
 ```
 
 The page should show `{"success":true,"message":"Email sent"}` and the mail should arrive.
 
 ## After the page is live
 
-Tell the ESS team. They set `ESS_MAIL_RELAY_URL=https://krai.asaindia.org/ess_notification.aspx`
+Tell the ESS team. They set `ESS_MAIL_RELAY_URL=https://krai.asaindia.org/pgplpgpless_notification.aspx`
 on the ESS server and restart it – every ESS notification then also goes as an email.

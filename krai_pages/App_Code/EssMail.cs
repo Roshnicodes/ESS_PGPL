@@ -8,8 +8,8 @@ using System.Text;
 using System.Web;
 using System.Web.UI;
 
-// Sends the ASA ESS (hr.asaindia.org – Tour Plan, TA/DA and Local Mileage) notification mails.
-// The ESS server calls ess_notification.aspx with GET parameters:
+// Sends the PGPL ESS (hr.asaindia.org/pgpl – Tour Plan, TA/DA and Local Mileage) notification mails.
+// The ESS server calls pgpless_notification.aspx with GET parameters:
 //
 //   to_email, to_name, subject, message, link, employee_name, employee_code,
 //   quarter, month, reviewer_role, reviewer_name, action, remarks, mail_type
@@ -25,10 +25,10 @@ using System.Web.UI;
 //       - leave EssSmtpHost empty to use <system.net><mailSettings> of the site
 //   EssMailFrom, EssMailFromName - sender address and name
 //   EssAllowedIps  - comma separated IPs allowed to call the page (the ESS server); empty = anyone
-//   EssLinkBase    - links in the mail must start with this (default https://hr.asaindia.org)
+//   EssLinkBase    - links in the mail must start with this (default https://hr.asaindia.org/pgpl)
 public static class EssMail
 {
-    private const string DefaultLinkBase = "https://hr.asaindia.org";
+    private const string DefaultLinkBase = "https://hr.asaindia.org/pgpl";
     private const string Blue = "#1d4ed8";
     private const string Green = "#15803d";
     private const string Red = "#b91c1c";
@@ -62,7 +62,7 @@ public static class EssMail
         string[] style;
         if (!MailTypes.TryGetValue(Param(page.Request, "mail_type"), out style))
         {
-            style = new[] { "ASA ESS notification", Blue, "Open ESS" };
+            style = new[] { "PGPL ESS notification", Blue, "Open ESS" };
         }
         Handle(page, style[0], style[1], style[2]);
     }
@@ -78,11 +78,11 @@ public static class EssMail
             if (!ValidEmail(toEmail)) { Answer(page, 400, false, "to_email is missing or invalid"); return; }
 
             string subject = OneLine(Param(request, "subject"));
-            if (subject.Length == 0) subject = "ASA ESS: " + heading;
+            if (subject.Length == 0) subject = "PGPL ESS: " + heading;
 
             using (MailMessage mail = new MailMessage())
             {
-                mail.From = new MailAddress(Setting("EssMailFrom", "noreply@asaindia.org"), Setting("EssMailFromName", "ASA ESS"));
+                mail.From = new MailAddress(Setting("EssMailFrom", "notification@pgplindia.co.in"), Setting("EssMailFromName", "PGPL ESS"));
                 mail.To.Add(new MailAddress(toEmail, OneLine(Param(request, "to_name"))));
                 mail.Subject = subject;
                 mail.SubjectEncoding = Encoding.UTF8;
@@ -122,7 +122,7 @@ public static class EssMail
         html.Append("<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;\">");
 
         html.Append("<tr><td style=\"background:").Append(Enc(accentColor)).Append(";padding:18px 24px;color:#ffffff;\">");
-        html.Append("<div style=\"font-size:13px;opacity:0.9;\">Action For Social Advancement (ASA) &middot; Employee Self Service</div>");
+        html.Append("<div style=\"font-size:13px;opacity:0.9;\">PGPL &middot; Employee Self Service</div>");
         html.Append("<div style=\"font-size:20px;font-weight:bold;margin-top:4px;\">").Append(Enc(heading)).Append("</div>");
         html.Append("</td></tr>");
 
@@ -146,7 +146,7 @@ public static class EssMail
         html.Append("<p style=\"margin:0;font-size:12px;color:#6b7280;\">Or open: ").Append(Enc(link)).Append("</p>");
 
         html.Append("</td></tr>");
-        html.Append("<tr><td style=\"padding:14px 24px;background:#f9fafb;font-size:12px;color:#6b7280;\">This is an automatic mail from ASA ESS (hr.asaindia.org). Please do not reply.</td></tr>");
+        html.Append("<tr><td style=\"padding:14px 24px;background:#f9fafb;font-size:12px;color:#6b7280;\">This is an automatic mail from PGPL ESS (hr.asaindia.org/pgpl). Please do not reply.</td></tr>");
         html.Append("</table></td></tr></table></body></html>");
         return html.ToString();
     }
