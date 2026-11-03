@@ -9,20 +9,30 @@ class Approvals::ClaimsController < ApplicationController
     base = TourClaim.where(claim_type: @type).includes(:user, :tour, :approved_by, :project)
     @claims =
       if @scope == "approved"
-        (current_user.finance? || current_user.hr? ? base : base.where(user: current_user).or(base.where(l1_approver: current_user)).or(base.where(l2_approver: current_user)).or(base.where(finance_approver: current_user)).or(base.where(id: ClaimApprovalStep.where(approver_id: current_user.id).select(:tour_claim_id))))
-          .approved.order(approved_at: :desc)
+        if current_user.finance? || current_user.hr?
+          base.approved.order(approved_at: :desc)
+        else
+          mine = base.where(user: current_user).or(base.where(l1_approver: current_user)).or(base.where(l2_approver: current_user)).or(base.where(finance_approver: current_user)).or(base.where(id: ClaimApprovalStep.where(approver_id: current_user.id).select(:tour_claim_id)))
+          # history of the reviewer: also claims they already approved as L1 / L2 / extra approver and that are still
+          # on their way (status column shows the real stage; "Approved" only after the final approval)
+          acted = base.where(l1_approved_by: current_user).or(base.where(l2_approved_by: current_user))
+                      .or(base.where(id: ClaimApprovalStep.where(acted_by_id: current_user.id).select(:tour_claim_id)))
+                      .where.not(status: %w[draft cancelled])
+          base.where(id: mine.approved.select(:id)).or(base.where(id: acted.select(:id)))
+              .order(Arel.sql("COALESCE(tour_claims.approved_at, tour_claims.updated_at) DESC"))
+        end
       else
         base.in_queue_of(current_user).order(:submitted_at)
       end
     respond_to do |format|
       format.html { @claims = @claims.page(params[:page]).per(25) }
       format.xlsx do
-        send_data ClaimExport.new(@claims.includes(:budget_line_item, :budget_line_item_code, :l1_approved_by, :l2_approved_by, :bank_account), viewer: current_user).to_xlsx,
+        send_data ClaimExport.new(@claims.includes(:l1_approved_by, :l2_approved_by, :bank_account), viewer: current_user).to_xlsx,
                   filename: "#{@type == 'local' ? 'local_mileage' : 'tada'}_claims_#{@scope}_#{Date.current}.xlsx",
                   type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       end
       format.csv do
-        send_data ClaimExport.new(@claims.includes(:budget_line_item, :budget_line_item_code, :l1_approved_by, :l2_approved_by, :bank_account), viewer: current_user).to_csv,
+        send_data ClaimExport.new(@claims.includes(:l1_approved_by, :l2_approved_by, :bank_account), viewer: current_user).to_csv,
                   filename: "#{@type == 'local' ? 'local_mileage' : 'tada'}_claims_#{@scope}_#{Date.current}.csv", type: "text/csv"
       end
     end

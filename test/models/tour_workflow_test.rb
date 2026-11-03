@@ -24,6 +24,23 @@ class TourWorkflowTest < ActiveSupport::TestCase
     assert_equal %w[saved_draft submitted l1_approved approved], t.activity_logs.pluck(:action)
   end
 
+  test "tour can be planned for past months and up to the end of next month only" do
+    travel_to Date.new(2026, 10, 31) do
+      nov = @emp.tours.new(from_date: Date.new(2026, 11, 28), to_date: Date.new(2026, 11, 30))
+      nov.valid?
+      assert_not nov.errors[:base].any? { |m| m.include?("planned only till") }
+
+      past = @emp.tours.new(from_date: Date.new(2026, 8, 3), to_date: Date.new(2026, 8, 4))
+      past.valid?
+      assert_not past.errors[:base].any? { |m| m.include?("planned only till") }
+
+      dec = @emp.tours.new(from_date: Date.new(2026, 11, 30), to_date: Date.new(2026, 12, 1))
+      assert_not dec.valid?
+      assert_includes dec.errors[:base], "Tour can be planned only till 30/11/2026 (current and next month)"
+    end
+    travel_to Date.new(2026, 11, 2) { assert_equal Date.new(2026, 12, 31), Tour.latest_plan_date }
+  end
+
   test "no L2 means L1 approval is final" do
     @emp.update!(l2_manager: nil)
     t = @emp.tours.create!(@attrs.merge(send_now: true))
