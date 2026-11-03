@@ -89,6 +89,9 @@ class TourWorkflowTest < ActiveSupport::TestCase
     c.forward!(by: @l1)
     assert c.finance_pending?
     assert_includes TourClaim.in_queue_of(user("FIN001")), c
+    admin = user("ADMIN")                                  # admin sees everything, but it is not pending with admin
+    refute_includes TourClaim.in_queue_of(admin), c
+    refute c.current_reviewer?(admin)
     c.approve!(by: user("FIN001"))
     assert c.approved?
   end
