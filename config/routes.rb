@@ -8,6 +8,12 @@ Rails.application.routes.draw do
     root "devise/sessions#new"
   end
 
+  # Forgot password (from the login page) – reset link mailed through krai
+  get   "password/forgot",        to: "password_resets#new",    as: :forgot_password
+  post  "password/forgot",        to: "password_resets#create"
+  get   "password/reset/:token",  to: "password_resets#edit",   as: :reset_password
+  patch "password/reset/:token",  to: "password_resets#update"
+
   # Tour Plan / Tour History  (?type=local => Local Mileage Claim / History)
   resources :tours, only: %i[index new create show edit update destroy] do
     member do

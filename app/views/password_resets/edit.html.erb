@@ -1,0 +1,25 @@
+<% content_for :title, "Set new password" %>
+<%= render layout: "shared/login_scene" do %>
+  <div class="mt-6 space-y-4">
+    <% if flash[:alert] %><div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><%= flash[:alert] %></div><% end %>
+    <p class="text-sm text-slate-600">Set a new password for <b><%= @user.name %></b> (<%= @user.emp_code %>).</p>
+    <%= form_with url: reset_password_path(token: params[:token]), method: :patch, class: "space-y-4", data: { turbo: false } do %>
+      <div data-controller="reveal">
+        <%= label_tag :password, "New password", class: "lbl" %>
+        <div class="relative">
+          <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-emerald-700/70"><%= icon(:lock, "h-5 w-5") %></span>
+          <%= password_field_tag :password, nil, required: true, minlength: User::PASSWORD_MINIMUM_LENGTH, autocomplete: "new-password", class: "inp pl-10 pr-10", data: { reveal_target: "input" } %>
+          <button type="button" class="absolute inset-y-0 right-2 flex items-center px-1 text-slate-400 hover:text-emerald-700" data-action="reveal#toggle" title="Show / hide password"><%= icon(:eye, "h-5 w-5") %></button>
+        </div>
+      </div>
+      <div>
+        <%= label_tag :password_confirmation, "Type it again", class: "lbl" %>
+        <div class="relative">
+          <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-emerald-700/70"><%= icon(:lock, "h-5 w-5") %></span>
+          <%= password_field_tag :password_confirmation, nil, required: true, autocomplete: "new-password", class: "inp pl-10" %>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary login-btn">Save new password <%= icon(:arrow_right) %></button>
+    <% end %>
+  </div>
+<% end %>

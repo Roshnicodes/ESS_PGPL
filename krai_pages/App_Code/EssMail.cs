@@ -39,6 +39,7 @@ public static class EssMail
     private static readonly Dictionary<string, string[]> MailTypes = new Dictionary<string, string[]>
     {
         { "tour_pending",     new[] { "Tour plan waiting for your approval", Blue,   "Review in ESS" } },
+        { "password_reset",   new[] { "Reset your ESS password",             Blue,   "Set a new password" } },
         { "tour_forwarded",   new[] { "Your tour plan was forwarded",        Blue,   "Open ESS" } },
         { "tour_approved",    new[] { "Tour plan approved",                  Green,  "Open ESS" } },
         { "tour_returned",    new[] { "Tour plan returned for correction",   Orange, "Correct and send again" } },

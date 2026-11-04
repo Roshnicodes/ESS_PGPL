@@ -83,6 +83,24 @@ class EssMailRelay
     }
   end
 
+  # Forgot password: one mail with the reset link (path is without the /pgpl prefix – app_url adds it).
+  def self.password_reset(user, path)
+    return false unless enabled?
+    EssMailJob.perform_later({
+      "to_email" => user.email.to_s.strip, "to_name" => user.name.to_s,
+      "subject" => "PGPL ESS: Reset your password",
+      "message" => "A password reset was asked for Employee Code #{user.emp_code}. The link works once and only for 2 hours. " \
+                   "If you did not ask for it, ignore this mail – your password stays the same",
+      "link" => "#{app_url}#{path}", "employee_name" => user.name.to_s, "employee_code" => user.emp_code.to_s,
+      "quarter" => "", "month" => "", "reviewer_role" => "", "reviewer_name" => "", "action" => "information",
+      "remarks" => "", "mail_type" => "password_reset"
+    })
+    true
+  rescue StandardError => error
+    Rails.logger.error("EssMailRelay could not queue password reset for user=#{user.id}: #{error.class} #{error.message}")
+    false
+  end
+
   # Notifier appends the remark as ' – “…”'; krai shows it in its own Remarks row
   def self.split_remark(text)
     m = text.match(/\A(.*) – “(.*)”\z/m)

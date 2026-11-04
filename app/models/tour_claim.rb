@@ -231,7 +231,7 @@ class TourClaim < ApplicationRecord
 
   def stage_label
     case status
-    when "draft"           then "Claim form prepared (not sent)"
+    when "draft"           then "Claim form prepared – not sent yet"
     when "submitted"       then "Pending with L1 – #{l1_approver}"
     when "l1_approved"     then "Forwarded to L2 – #{l2_approver}"
     when "extra_pending"   then "Forwarded to #{extra_label}"

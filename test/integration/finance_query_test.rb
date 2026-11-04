@@ -74,7 +74,7 @@ class LocalMileageBadgeTest < ActionDispatch::IntegrationTest
     sign_in user("ADMIN")
     get masters_all_tours_path
     row = response.body[/#{Regexp.escape(emp.name)}.*?<\/tr>/m]
-    assert_match ">Prepared<", row
+    assert_match ">Prepared (not sent)<", row
     assert_no_match ">Approved<", row
     get tour_path(tour)
     assert_match "Prepared (claim not sent)", response.body

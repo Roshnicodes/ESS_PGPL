@@ -1,0 +1,25 @@
+<% content_for :title, "Forgot password" %>
+<%= render layout: "shared/login_scene" do %>
+  <div class="mt-6 space-y-4">
+    <% if params[:sent] %>
+      <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        If this Employee Code has an email saved in ESS, a link to set a new password has been sent to it.
+        The link works for 2 hours. Please check your inbox (and spam folder).
+      </div>
+    <% end %>
+    <% if flash[:alert] %><div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"><%= flash[:alert] %></div><% end %>
+    <p class="text-sm text-slate-600">Forgot your password? Enter your Employee Code – we will mail you a link to set a new one.</p>
+    <%= form_with url: forgot_password_path, method: :post, class: "space-y-4", data: { turbo: false } do %>
+      <div>
+        <%= label_tag :emp_code, "Employee Code", class: "lbl" %>
+        <div class="relative">
+          <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-emerald-700/70"><%= icon(:user, "h-5 w-5") %></span>
+          <%= text_field_tag :emp_code, nil, required: true, autofocus: true, autocomplete: "username", placeholder: "e.g. 1025", class: "inp pl-10" %>
+        </div>
+      </div>
+      <button type="submit" class="btn-primary login-btn">Send reset link <%= icon(:arrow_right) %></button>
+    <% end %>
+    <p class="text-xs text-slate-500">No email saved in ESS? Ask HR / admin to reset your password.</p>
+    <%= link_to new_user_session_path, class: "inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline" do %>← Back to login<% end %>
+  </div>
+<% end %>
