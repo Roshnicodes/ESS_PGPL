@@ -35,9 +35,22 @@ class LocalBadgeAndDashboardTest < ActionDispatch::IntegrationTest
     t = @emp.tours.create!(from_date: Date.current, to_date: Date.current + 1, send_now: true,
       tour_visits_attributes: [ { visit_date: Date.current, place: "Jhabua", planned_activity: "Visit" } ])
     t.update_columns(status: "approved", approved_at: Time.current, decided_by_id: @l1.id)
+    pending = @l1.tours.create!(from_date: Date.current - 1, to_date: Date.current, send_now: true,
+      tour_visits_attributes: [ { visit_date: Date.current, place: "Petlawad", planned_activity: "Visit" } ])
     sign_in @l1
     get authenticated_root_path
     assert_match 'id="on-tour-today"', response.body
+    assert_match on_tour_path, response.body                 # card opens a page, not a popup
+    get on_tour_path
+    assert_response :success
     assert_match "Jhabua", response.body
+    assert_match "Tour Approved", response.body
+    assert_match "Petlawad", response.body
+    assert_match "Pending L1", response.body                 # not approved yet – shown with its status
+    assert_match %(id="on-tour-#{t.id}"), response.body      # details popup of the employee
+    get on_tour_path(status: "approved")
+    assert_no_match "Petlawad", response.body
+    get on_tour_path(date: (Date.current + 30).to_s)
+    assert_match "No one is on tour", response.body
   end
 end

@@ -8,6 +8,9 @@ Rails.application.routes.draw do
     root "devise/sessions#new"
   end
 
+  # Colleagues on tour on a day (dashboard card → this page)
+  get "on-tour", to: "on_tour#index", as: :on_tour
+
   # Forgot password (from the login page) – reset link mailed through krai
   get   "password/forgot",        to: "password_resets#new",    as: :forgot_password
   post  "password/forgot",        to: "password_resets#create"
