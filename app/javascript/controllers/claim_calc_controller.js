@@ -36,14 +36,23 @@ export default class extends Controller {
     const amountEl = q("amount")
     const deduction = this.num(q("deduction")?.dataset.value)
 
+    // "NA" mode = no journey on this line: ticket / meters / KM / purpose / amount are not needed – cleared and locked
+    const na = q("mode")?.selectedOptions[0]?.dataset.na === "true"
+    row.querySelectorAll("[data-calc='na_clear']").forEach((el) => { if (na) el.value = ""; el.readOnly = na })
+    if (kind === "city") {
+      if (na) amountEl.value = ""
+      amountEl.readOnly = na
+    }
+
     if (kind === "local") {
       const opt = q("mode")?.selectedOptions[0]
       const manual = opt?.dataset.manual === "true"
       const rate = this.num(opt?.dataset.rate)
       const [mf, mt, km] = [q("metfrom"), q("metto"), q("km")]
-      mf.readOnly = mt.readOnly = manual
-      km.readOnly = !manual
-      amountEl.readOnly = !manual
+      mf.readOnly = mt.readOnly = manual || na
+      km.readOnly = !manual || na
+      amountEl.readOnly = !manual || na
+      if (na) { mf.value = mt.value = km.value = amountEl.value = "" }
 
       // Another mode is another basis for the row, so the figures the previous
       // mode worked out are cleared instead of being carried over.
@@ -52,8 +61,10 @@ export default class extends Controller {
       // Public Transport has no meter trail – its bill / ticket ref is the proof.
       const purpose = q("purpose")
       if (purpose) {
-        purpose.required = manual
-        purpose.placeholder = manual ? "Bill / ticket ref" : ""
+        purpose.required = manual && !na
+        purpose.readOnly = na
+        if (na) purpose.value = ""
+        purpose.placeholder = na ? "Not needed (NA)" : manual ? "Bill / ticket ref" : ""
       }
 
       if (manual) {

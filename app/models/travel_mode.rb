@@ -22,6 +22,9 @@ class TravelMode < ApplicationRecord
   scope :tour_plan,    -> { active.where(for_tour_plan: true).ordered }
   scope :city_travel,  -> { active.where(for_city_travel: true).ordered }
   scope :local_travel, -> { active.where(for_local_travel: true).ordered }
+  # "NA" (category none) – no journey on that line: nothing to fill, amount 0
+  NA_SQL = "travel_modes.category = 'none' OR UPPER(TRIM(travel_modes.name)) IN ('NA', 'N/A')".freeze
+  scope :not_applicable, -> { where(NA_SQL) }
 
   # Rate applicable on a given date (latest effective_from <= date).
   def rate_on(date = Date.current)
@@ -49,6 +52,8 @@ class TravelMode < ApplicationRecord
       mode_approvers.reset
     end
   end
+
+  def not_applicable? = category_none? || name.to_s.strip.upcase.in?(%w[NA N/A])
 
   def to_s = name
 end

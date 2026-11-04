@@ -3,10 +3,10 @@ module ClaimsHelper
   def claim_cities      = @claim_cities ||= City.active.ordered.to_a
   # A. Travel: every active mode from the master used for tours / city travel (anything HR adds shows up)
   def city_travel_modes
-    @city_travel_modes ||= TravelMode.active.where("for_city_travel OR for_tour_plan").where.not(name: "NA").ordered
+    @city_travel_modes ||= TravelMode.active.where("for_city_travel OR for_tour_plan OR #{TravelMode::NA_SQL}").ordered
                                      .includes(mode_approvers: :user).to_a
   end
-  def local_travel_modes = @local_travel_modes ||= TravelMode.local_travel.includes(:mileage_rates).to_a
+  def local_travel_modes = @local_travel_modes ||= TravelMode.active.where("for_local_travel OR #{TravelMode::NA_SQL}").ordered.includes(:mileage_rates).to_a
 
   def nd(date)  = tag.span(d(date), class: "whitespace-nowrap")
   def ndt(time) = tag.span(dt(time), class: "whitespace-nowrap")
