@@ -44,7 +44,7 @@ class LocalBadgeAndDashboardTest < ActionDispatch::IntegrationTest
     get on_tour_path
     assert_response :success
     assert_match "Jhabua", response.body
-    assert_match "Tour Approved", response.body
+    assert_match "Plan approved", response.body
     assert_match "Petlawad", response.body
     assert_match "Pending L1", response.body                 # not approved yet – shown with its status
     assert_match %(id="on-tour-#{t.id}"), response.body      # details popup of the employee

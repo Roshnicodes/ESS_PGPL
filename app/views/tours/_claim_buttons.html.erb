@@ -1,0 +1,11 @@
+<%# locals: (tour:, c:) %>
+<% if tour.user_id == current_user.id %>
+  <% if c.nil? && tour.claimable? %><%= link_to new_tour_claim_path(tour), class: "btn-primary btn-xs" do %><%= icon(:receipt) %> Make Claim<% end %>
+  <% elsif c&.employee_editable? %><%= link_to edit_tour_claim_path(tour), class: "btn-primary btn-xs" do %><%= icon(:pencil) %> Edit Claim<% end %>
+  <% elsif c&.reapproval_on_edit? %>
+    <%# already sent / approved – the employee may still correct it, and it then goes to L1 again %>
+    <%= link_to edit_tour_claim_path(tour), class: "btn-light btn-xs", title: "Correct the claim – it will be sent for approval again from L1" do %><%= icon(:pencil) %> Edit Claim<% end %>
+    <%= link_to tour_claim_path(tour), class: "btn-light btn-xs" do %><%= icon(:eye) %> Claim<% end %>
+  <% elsif c %><%= link_to tour_claim_path(tour), class: "btn-light btn-xs" do %><%= icon(:eye) %> Claim<% end %><% end %>
+<% end %>
+<% if c&.current_reviewer?(current_user) %><%= link_to approvals_claim_path(c), class: "btn-primary btn-xs" do %><%= icon(:clipboard) %> Review Claim<% end %><% end %>

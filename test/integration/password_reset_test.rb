@@ -3,16 +3,29 @@ require "test_helper"
 class PasswordResetTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
+  # The reset mail goes straight to krai (not queued) – capture it instead of calling krai.
   setup do
     @emp = user("1025")
     @emp.update_columns(email: "roshni@example.org")
-    @relay_was = ENV["ESS_MAIL_RELAY_URL"]
-    ENV["ESS_MAIL_RELAY_URL"] = "https://krai.asaindia.org/pgpless_notification.aspx"
+    @sent = []
+    @fail_mail = false
+    sent, test = @sent, self
+    @deliver_was = EssMailRelay.method(:deliver!)
+    EssMailRelay.define_singleton_method(:deliver!) do |params, relay_url: url|
+      raise EssMailRelay::DeliveryError, "service unavailable" if test.instance_variable_get(:@fail_mail)
+      sent << [ params, relay_url ]
+      true
+    end
   end
-  teardown { ENV["ESS_MAIL_RELAY_URL"] = @relay_was }
+  teardown do
+    was = @deliver_was
+    EssMailRelay.define_singleton_method(:deliver!) { |*args, **kw| was.call(*args, **kw) }
+  end
 
   def reset_link
-    params = enqueued_jobs.select { _1["job_class"] == "EssMailJob" }.last["arguments"].first
+    params, relay_url = @sent.last
+    assert_equal EssMailRelay.password_reset_url, relay_url
+    assert_equal "pending", params["action"]
     assert_equal "password_reset", params["mail_type"]
     assert_equal "roshni@example.org", params["to_email"]
     assert_match %r{\Ahttps://hr\.asaindia\.org/pgpl/password/reset/[\w-]+\z}, params["link"]
@@ -40,7 +53,8 @@ class PasswordResetTest < ActionDispatch::IntegrationTest
   end
 
   test "unknown code looks the same and sends nothing; expired link is refused" do
-    assert_no_enqueued_jobs(only: EssMailJob) { post forgot_password_path, params: { emp_code: "NOPE" } }
+    post forgot_password_path, params: { emp_code: "NOPE" }
+    assert_empty @sent
     assert_redirected_to forgot_password_path(sent: 1)
 
     post forgot_password_path, params: { emp_code: "1025" }
@@ -53,12 +67,34 @@ class PasswordResetTest < ActionDispatch::IntegrationTest
 
   test "asking again within 2 minutes does not send a second mail" do
     post forgot_password_path, params: { emp_code: "1025" }
-    assert_no_enqueued_jobs(only: EssMailJob) { post forgot_password_path, params: { emp_code: "1025" } }
+    post forgot_password_path, params: { emp_code: "1025" }
+    assert_equal 1, @sent.size
+  end
+
+  test "a failed mail keeps the earlier reset link working" do
+    post forgot_password_path, params: { emp_code: "1025" }
+    path = reset_link
+    @emp.update_columns(reset_password_sent_at: 10.minutes.ago)   # past the 2-minute wait
+    @fail_mail = true
+    post forgot_password_path, params: { emp_code: "1025" }
+    assert_redirected_to forgot_password_path(sent: 1)
+    get path
+    assert_response :success                                     # old link still valid
+  end
+
+  test "password reset has a relay even where notification mail is off" do
+    old_url = ENV.delete("ESS_MAIL_RELAY_URL")
+    old_reset = ENV.delete("ESS_PASSWORD_RESET_MAIL_RELAY_URL")
+    assert_not EssMailRelay.enabled?
+    assert_equal EssMailRelay::DEFAULT_RELAY_URL, EssMailRelay.password_reset_url
+  ensure
+    ENV["ESS_MAIL_RELAY_URL"] = old_url if old_url
+    ENV["ESS_PASSWORD_RESET_MAIL_RELAY_URL"] = old_reset if old_reset
   end
 end
 
 class TourClaimClarityTest < ActionDispatch::IntegrationTest
-  test "approved tour with a saved claim: tour says Tour Approved, claim says not sent – two stamps" do
+  test "approved tour with a saved claim: plan and claim have their own card, badge and stamp" do
     emp = user("1025"); am = user("AM001")
     tour = emp.tours.create!(send_now: true, from_date: Date.current - 6, to_date: Date.current - 4,
       tour_visits_attributes: [ { visit_date: Date.current - 6, place: "Jhabua", planned_activity: "SHG" } ])
@@ -68,11 +104,15 @@ class TourClaimClarityTest < ActionDispatch::IntegrationTest
     claim.save!
     sign_in emp
     get tour_path(tour)
-    assert_match "Tour Approved", response.body
-    assert_match "Claim: Prepared (not sent)", response.body
-    assert_match ">Tour Plan<", response.body          # stamp top line
-    assert_match ">TA/DA Claim<", response.body
-    assert_match ">Not sent<", response.body
+    body = response.body
+    assert_match ">Plan approved<", body                               # the plan, not its claim
+    assert_match "TA/DA Claim", body                                   # the claim's own card
+    assert_match ">Prepared<", body                                    # claim badge on that card
+    assert_match %r{seal-top">Tour Plan<.*?seal-word">Approved<}m, body
+    assert_match %r{seal-top">TA/DA Claim<.*?seal-word">Not sent<}m, body
+    assert_match "Tour plan history", body                             # plan and claim history kept apart
+    assert_match "Claim history", body
+    assert_equal 2, body.scan('class="seal ').size
   end
 
   test "All Tours lists pending first and only-saved last" do

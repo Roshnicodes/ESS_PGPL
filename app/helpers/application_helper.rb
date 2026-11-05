@@ -13,25 +13,19 @@ module ApplicationHelper
     "cancelled" => "bg-slate-100 text-slate-500 ring-slate-300/60"
   }.freeze
 
-  STATUS_LABELS = { "submitted" => "Pending L1", "draft" => "Prepared (not sent)", "l1_approved" => "Forwarded to L2", "l2_approved" => "Forwarded for extra approval", "finance_pending" => "Forwarded to PD Finance", "finance_query" => "Finance query", "extra_pending" => "Extra approval" }.freeze
+  STATUS_LABELS = { "submitted" => "Pending L1", "draft" => "Prepared", "l1_approved" => "Forwarded to L2", "l2_approved" => "Forwarded for extra approval", "finance_pending" => "Forwarded to PD Finance", "finance_query" => "Finance query", "extra_pending" => "Extra approval" }.freeze
 
   # Tour badge. A Local Mileage is self-sanctioned the moment it is created, so it follows its claim:
-  # "Prepared (not sent)" until the claim is sent, then the claim's own stage (Pending L1 … Forwarded to PD Finance,
-  # Returned, Rejected); "Approved" only once the claim itself is approved.
-  # An approved Tour Plan says "Tour Approved" – its claim has its own badge, so the two are never confused.
+  # "Prepared" until the claim is sent, then the claim's own stage (Pending L1 … Forwarded to PD Finance, Returned,
+  # Rejected); "Approved" only once the claim itself is approved.
   def tour_status_badge(tour, label: nil)
     if tour.type_local? && tour.approved?
       claim = tour.tour_claim
-      return status_badge("draft", label: "Prepared (not sent)") if claim.nil? || claim.draft?
+      return status_badge("draft", label: "Prepared") if claim.nil? || claim.draft?
       return status_badge(claim.status) unless claim.approved?
     end
-    label ||= "Tour Approved" if tour.type_tour? && tour.approved?
+    label ||= "Plan approved" if tour.type_tour? && tour.approved?   # the plan, not its claim
     status_badge(tour.status, label: label)
-  end
-
-  # Claim badge with the word "Claim" in it, for places that show a tour and its claim side by side.
-  def claim_status_badge(claim)
-    status_badge(claim.status, label: "Claim: #{STATUS_LABELS.fetch(claim.status.to_s, claim.status.to_s.humanize)}")
   end
 
   def status_badge(status, label: nil)
@@ -106,13 +100,18 @@ module ApplicationHelper
 
   ACTION_LABELS = {
     "submitted" => "Tour sent for approval", "approved" => "Tour approved", "self_sanctioned" => "Tour self-sanctioned",
-    "cancelled" => "Tour cancelled", "claim_created" => "Claim form prepared (not sent yet)", "claim_submitted" => "Claim sent",
+    "cancelled" => "Tour cancelled", "claim_created" => "Claim form prepared", "claim_submitted" => "Claim sent",
     "claim_l1_approved" => "Claim forwarded by L1", "claim_l2_approved" => "Claim forwarded by L2", "l1_approved" => "Tour forwarded to L2 by L1", "l2_approved" => "Tour forwarded for extra approval", "extra_forwarded" => "Tour forwarded to next approver", "edited_resubmitted" => "Tour edited & sent again for approval",
     "it_tool_opened" => "Opened IT tool", "it_tool_settings_changed" => "IT Tools settings changed", "claim_extra_approved" => "Claim forwarded (extra approval)", "claim_query_sent" => "Finance query sent", "claim_query_replied" => "Finance query replied",
     "city_added" => "City added", "city_updated" => "City updated", "city_enabled" => "City enabled", "city_disabled" => "City disabled", "saved_draft" => "Tour saved (draft)", "claim_approved" => "Claim approved (PD Finance)",
     "claim_rejected" => "Claim rejected (final)", "claim_returned" => "Claim returned to employee", "returned" => "Tour returned to employee", "rejected" => "Tour rejected (final)", "claim_cancelled" => "Claim cancelled", "deduction_updated" => "Deductions updated", "admin_edited" => "Edited by admin", "deleted" => "Deleted by admin",
     "bank_added" => "Bank account added", "bank_updated" => "Bank account updated", "bank_activated" => "Bank account activated",
-    "bank_deactivated" => "Bank account deactivated", "bank_primary" => "Primary bank account changed"
+    "bank_deactivated" => "Bank account deactivated", "bank_primary" => "Primary bank account changed",
+    "claim_edited_resubmitted" => "Claim edited by employee & sent again for approval",
+    "circular_created" => "IOM / Circular published", "circular_updated" => "IOM / Circular edited",
+    "circular_notified" => "IOM / Circular notification sent", "circular_activated" => "IOM / Circular activated",
+    "circular_deactivated" => "IOM / Circular deactivated",
+    "payment_recorded" => "Payment UTR recorded", "payment_utr_corrected" => "Payment UTR corrected"
   }.freeze
 
   # Older local-mileage records used an "approved" activity with this remark.  It
@@ -131,7 +130,7 @@ module ApplicationHelper
   # Rubber stamp put on a printed tour / claim: the word, who stamped it, when.
   SEALS = {
     "approved" => [ "Approved", "seal-ok" ],
-    "draft" => [ "Pending", "seal-wait" ],
+    "draft" => [ "Not sent", "seal-wait" ],
     "submitted" => [ "Pending", "seal-wait" ],
     "l1_approved" => [ "Pending", "seal-wait" ],
     "l2_approved" => [ "Pending", "seal-wait" ],
@@ -147,19 +146,22 @@ module ApplicationHelper
   # so that is what the stamp on a local mileage page has to follow.
   def tour_seal_record(tour) = tour.type_local? ? tour.tour_claim : tour
 
+  # What a stamp is about – printed on its rim, so a "Tour Plan · Approved" stamp is never read as an approved claim.
+  def seal_subject(record)
+    return "Tour Plan" if record.is_a?(Tour)
+    record.try(:type_local?) ? "Local Mileage" : "TA/DA Claim"
+  end
+
   # Shown on screen and on the printed copy, at the foot of the document.
-  # The top line names the document (Tour Plan / TA-DA Claim / Local Mileage), so an approved tour's
-  # stamp is never read as an approved claim. A claim that is only saved says "Not sent".
   def approval_seal(record, css: nil)
     return "".html_safe if record.nil?
     word, tone = SEALS[record.status.to_s]
     return "".html_safe unless word
-    word = "Not sent" if record.is_a?(TourClaim) && record.draft?
     who, at = seal_signatory(record)
     tag.div(class: [ "seal", tone, css ]) do
       tag.div(class: "seal-ring") do
         tag.div(class: "seal-core") do
-          tag.div(seal_document(record), class: "seal-top") +
+          tag.div(seal_subject(record), class: "seal-top") +
             tag.div(word, class: "seal-word") +
             (who.present? ? tag.div(who, class: "seal-line") : "".html_safe) +
             (at ? tag.div(d(at), class: "seal-line") : "".html_safe)
@@ -183,19 +185,13 @@ module ApplicationHelper
     end
   end
 
-  def seal_document(record)
-    if record.is_a?(TourClaim) then record.type_local? ? "Local Mileage" : "TA/DA Claim"
-    else record.try(:type_local?) ? "Local Mileage" : "Tour Plan"
-    end
-  end
-
   # The stamp has no room for the "(JIT)" suffix display_name adds.
   def seal_person(value) = (value.is_a?(User) ? value.name : value.to_s).presence
 
   # Short line for a stamp that is still travelling – the circle has no room
   # for a whole stage_label.
   def seal_waiting_with(record)
-    return "Not sent yet" if record.draft?
+    return "Saved only" if record.draft?
     if record.respond_to?(:current_approver)   # tour: L1 → L2 → extra approvers
       name = record.l2_approved? ? record.l3_label : record.current_approver&.name
     else                                       # claim: L1 → L2 → PD Finance

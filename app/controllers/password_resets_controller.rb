@@ -15,9 +15,7 @@ class PasswordResetsController < ApplicationController
   def create
     user = User.where(active: true).where("LOWER(TRIM(emp_code)) = ?", params[:emp_code].to_s.strip.downcase).first
     if user&.email.to_s.include?("@") && !(user.reset_password_sent_at && user.reset_password_sent_at > RESEND_AFTER.ago)
-      token = SecureRandom.urlsafe_base64(32)
-      user.update_columns(reset_password_token: Digest::SHA256.hexdigest(token), reset_password_sent_at: Time.current)
-      EssMailRelay.password_reset(user, reset_password_path(token: token, script_name: ""))
+      send_link(user)
     end
     redirect_to forgot_password_path(sent: 1)
   end
@@ -44,6 +42,20 @@ class PasswordResetsController < ApplicationController
   end
 
   private
+
+  # The new token is made here but saved only after krai has taken the mail: if the mail
+  # fails, the link the employee already has keeps working instead of being replaced by
+  # one that never arrived. The mail goes out at once (not queued), so it also works where
+  # ordinary notification mail is switched off.
+  def send_link(user)
+    token = SecureRandom.urlsafe_base64(32)
+    EssMailRelay.password_reset!(user, reset_password_path(token: token, script_name: ""))
+    user.update_columns(reset_password_token: Digest::SHA256.hexdigest(token), reset_password_sent_at: Time.current)
+    true
+  rescue StandardError => error
+    Rails.logger.error("Password reset mail failed for #{user.emp_code}: #{error.class} #{error.message}")
+    false
+  end
 
   def load_user_by_token
     digest = Digest::SHA256.hexdigest(params[:token].to_s)

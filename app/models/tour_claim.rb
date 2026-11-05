@@ -42,6 +42,7 @@ class TourClaim < ApplicationRecord
   belongs_to :approved_by,    class_name: "User", optional: true
   belongs_to :rejected_by,    class_name: "User", optional: true
   belongs_to :returned_by,    class_name: "User", optional: true
+  belongs_to :utr_updated_by, class_name: "User", optional: true   # PD Finance who recorded the payment UTR
 
   blank_row = ->(keys) { ->(a) { a["id"].blank? && keys.all? { |k| a[k.to_s].blank? } } }
   has_many :claim_city_travels,     -> { order(:travel_date, :position) }, dependent: :destroy, inverse_of: :tour_claim
@@ -59,6 +60,10 @@ class TourClaim < ApplicationRecord
   accepts_nested_attributes_for :claim_visit_reports,    allow_destroy: true, reject_if: blank_row.(%i[visit_date place_visited tasks_accomplished])
 
   validates :advance_amount, numericality: { greater_than_or_equal_to: 0 }
+  # Payment Advice: the bank reference typed by PD Finance after the money is sent.
+  validates :utr_no, length: { in: 4..60 }, format: { with: /\A[A-Z0-9][A-Z0-9\/\-]*\z/,
+            message: "may use only letters, digits, / and -" }, allow_nil: true
+  validate  :utr_only_on_approved_claim
   # Helmet declaration is asked only when a two-wheeler is used.
   validates :helmet_declaration, acceptance: { accept: true, message: "must be ticked for two-wheeler travel" },
                                  if: -> { submitting? && two_wheeler_used? }
@@ -68,9 +73,14 @@ class TourClaim < ApplicationRecord
   validate  :reports_have_tasks, if: :submitting?
   validate  :bank_account_is_own, if: :bank_account_id_changed?
   validate  :lines_inside_tour_dates
+  validate  :local_month_still_open, if: -> { type_local? && (submitting? || new_record?) }
+
+  normalizes :utr_no, with: ->(v) { v.to_s.strip.upcase.gsub(/\s+/, "").presence }
+  normalizes :payment_remark, with: ->(v) { v.to_s.squish.presence }
 
   strip_blocked_words_from :general_description
   before_validation :inherit_from_tour, on: :create
+  before_validation :default_advance_to_zero
   before_save       :recalculate_totals
   after_create -> { log_activity!(:claim_created, actor: user, to: status) }
 
@@ -83,6 +93,16 @@ class TourClaim < ApplicationRecord
              { bank_account: { passbook_attachment: :blob } })
   }
   scope :newest_first, -> { order(updated_at: :desc, id: :desc) }
+  # Payment Advice working lists
+  scope :awaiting_payment, -> { approved.where(utr_no: nil) }
+  scope :paid,             -> { approved.where.not(utr_no: nil) }
+
+  # Whose payment this person records: PD Finance / admin settle everything; a named
+  # Finance approver settles the employees HR put them on (and anything they approved).
+  def self.payable_by(user)
+    return all if user.finance?
+    where(finance_approver_id: user.id).or(where(approved_by_id: user.id))
+  end
   scope :in_queue_of, ->(u) {
     queues = where(status: "submitted", l1_approver_id: u.id).or(where(status: "l1_approved", l2_approver_id: u.id))
     queues = queues.or(where(status: "finance_pending", finance_approver_id: u.id))
@@ -136,6 +156,36 @@ class TourClaim < ApplicationRecord
 
   def employee_editable? = draft? || returned?   # rejected is final
   def submitting? = !!submitting
+
+  # ---- Employee's own edit window -----------------------------------------
+  # The employee may correct their claim until the money is out: while it is only saved,
+  # while it is with an approver, and even after PD Finance approved it. Editing a claim
+  # that is no longer a draft cancels the approvals it already had and sends it to L1
+  # again (see #resend_after_edit!), because an approval belongs to the figures the
+  # approver actually saw. Once PD Finance has recorded the payment UTR the claim is
+  # closed, and a rejected / cancelled claim is final.
+  def reapproval_on_edit? = (in_process? || approved?) && !paid?
+  def maker_editable?     = employee_editable? || reapproval_on_edit?
+  def in_process?         = status.in?(IN_PROCESS)
+
+  # ---- Local mileage month window -----------------------------------------
+  # A local claim for month M may be sent only till the cutoff day of M+1 (PD HR
+  # sets that day globally or per employee). After it the month is closed for good.
+  # Not memoized: it reads Date.current, and a claim object outliving midnight
+  # (or a background job) must see today's window, not the one it was built in.
+  def local_period = (LocalMileagePeriod.new(user) if user)
+
+  def local_claim_month = tour&.claim_month
+
+  def local_month_closed?
+    return false unless type_local? && local_claim_month && local_period
+    local_period.closed?(local_claim_month)
+  end
+
+  # Last date this local claim may be sent for approval.
+  def local_send_by = (local_period.deadline_for(local_claim_month) if type_local? && local_claim_month && local_period)
+
+  def local_month_closed_message = local_period&.closed_message(local_claim_month)
 
   def current_reviewer?(u)
     (submitted? && l1_approver_id == u.id) ||
@@ -231,7 +281,7 @@ class TourClaim < ApplicationRecord
 
   def stage_label
     case status
-    when "draft"           then "Claim form prepared – not sent yet"
+    when "draft"           then "Claim form prepared (not sent)"
     when "submitted"       then "Pending with L1 – #{l1_approver}"
     when "l1_approved"     then "Forwarded to L2 – #{l2_approver}"
     when "extra_pending"   then "Forwarded to #{extra_label}"
@@ -250,16 +300,19 @@ class TourClaim < ApplicationRecord
     transition!(by: by, action: :claim_submitted) do
       raise Workflow::NotAllowed, "Only the employee can send this claim" unless by.id == user_id
       raise Workflow::NotAllowed, "Claim already sent" unless employee_editable?
-      self.submitting   = true
-      self.submitted_at = Time.current
-      self.l1_approver  = user.reporting_manager
-      self.l2_approver  = (user.l2_manager unless user.l2_manager_id.nil? || user.l2_manager_id == user.reporting_manager_id)
-      raise Workflow::NotAllowed, "L1 (reporting manager) is not set. Contact PD HR." if l1_approver.nil?
-      self.finance_approver = user.finance_approver
-      assign_extra_steps
-      self.returned_at = self.returned_by = self.return_remark = nil
-      self.l1_approved_at = self.l1_approved_by = self.l2_approved_at = self.l2_approved_by = nil
-      self.status = "submitted"
+      start_approval!
+    end
+  end
+
+  # The employee corrected a claim that was already sent (or already approved): every
+  # approval it had is cleared and it goes to L1 again, so nobody's approval is carried
+  # over to figures they never saw. Blocked once the payment UTR is recorded.
+  def resend_after_edit!(by:)
+    transition!(by: by, action: :claim_edited_resubmitted) do
+      raise Workflow::NotAllowed, "Only the employee can edit this claim" unless by.id == user_id
+      raise Workflow::NotAllowed, "This claim can no longer be edited" unless reapproval_on_edit?
+      clear_decisions!
+      start_approval!
     end
   end
 
@@ -341,6 +394,25 @@ class TourClaim < ApplicationRecord
     log_activity!(:claim_cancelled, actor: by, from: from, to: status, remark: remark)
   end
 
+  # ---- Payment Advice ------------------------------------------------------
+
+  def paid? = utr_no.present?
+
+  # Records (or corrects) the bank reference against an approved claim.
+  # Returns false with errors when the claim is not payable or the UTR is malformed.
+  def record_payment!(utr:, by:, paid_on: nil, remark: nil)
+    was = utr_no
+    assign_attributes(utr_no: utr, paid_on: paid_on.presence || paid_on_default(was),
+                      payment_remark: remark, utr_updated_by: by, utr_updated_at: Time.current)
+    return false unless save
+    log_activity!(was.present? ? :payment_utr_corrected : :payment_recorded, actor: by,
+                  details: { utr: utr_no, was: was, paid_on: paid_on&.to_s, amount: balance_amount.to_s }.compact)
+    Notifier.payment(self, actor: by)
+    true
+  end
+
+  def paid_on_default(previous) = previous.present? ? paid_on : Date.current
+
   def two_wheeler_used?
     claim_local_travels.reject(&:marked_for_destruction?).any? { |l| l.travel_mode&.name.to_s =~ /two/i } ||
       claim_city_travels.reject(&:marked_for_destruction?).any? { |l| l.travel_mode&.name.to_s =~ /two/i }
@@ -349,6 +421,28 @@ class TourClaim < ApplicationRecord
   def to_s = "Claim · #{tour.duration_label}"
 
   private
+
+  # Sends the claim to L1 (fresh send, or again after an edit).
+  def start_approval!
+    self.submitting   = true
+    self.submitted_at = Time.current
+    self.l1_approver  = user.reporting_manager
+    self.l2_approver  = (user.l2_manager unless user.l2_manager_id.nil? || user.l2_manager_id == user.reporting_manager_id)
+    raise Workflow::NotAllowed, "L1 (reporting manager) is not set. Contact PD HR." if l1_approver.nil?
+    self.finance_approver = user.finance_approver
+    assign_extra_steps
+    self.returned_at = self.returned_by = self.return_remark = nil
+    self.l1_approved_at = self.l1_approved_by = self.l2_approved_at = self.l2_approved_by = nil
+    self.status = "submitted"
+  end
+
+  # Wipes what earlier approvers decided, so the claim starts clean at L1 after an edit.
+  def clear_decisions!
+    self.l1_remark = self.l2_remark = self.finance_remark = nil
+    self.approved_at = self.approved_by = nil
+    self.extra_approver = nil
+    claim_queries.select(&:open?).each { |q| q.update!(answer: "Claim edited by the employee – sent for approval again", answered_at: Time.current) }
+  end
 
   def transition!(by:, action:, remark: nil)
     with_lock do
@@ -387,6 +481,19 @@ class TourClaim < ApplicationRecord
     if tour.approved? && !tour.claimable?
       errors.add(:base, "Claim form opens on #{tour.claim_open_on.strftime('%d/%m/%Y')} (after tour To-Date)")
     end
+  end
+
+  # Blank "Less Advance Taken" means no advance was taken.
+  def default_advance_to_zero
+    self.advance_amount = 0 if advance_amount.blank?
+  end
+
+  def local_month_still_open
+    errors.add(:base, local_month_closed_message) if local_month_closed?
+  end
+
+  def utr_only_on_approved_claim
+    errors.add(:utr_no, "can be recorded only on an approved claim") if utr_no.present? && !approved?
   end
 
   def has_some_expense

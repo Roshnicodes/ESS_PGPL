@@ -2,10 +2,11 @@
 class TourClaimsController < ApplicationController
   before_action :set_tour
   before_action :set_claim, except: %i[new create]
+  before_action :block_closed_local_month, only: %i[new create edit update]
 
   def new
     if (existing = @tour.tour_claim)
-      return redirect_to edit_tour_claim_path(@tour) if existing.employee_editable?
+      return redirect_to edit_tour_claim_path(@tour) if existing.maker_editable?
       return redirect_to tour_claim_path(@tour)
     end
     @claim = TourClaim.build_for(@tour)
@@ -33,8 +34,9 @@ class TourClaimsController < ApplicationController
 
   def update
     authorize! :update, @claim
+    needs_reapproval = @claim.reapproval_on_edit?   # already sent / approved – read it before the form overwrites anything
     @claim.assign_attributes(claim_params)
-    save_and_maybe_submit
+    needs_reapproval ? save_and_resend : save_and_maybe_submit
   end
 
   # Print / view
@@ -44,6 +46,21 @@ class TourClaimsController < ApplicationController
   end
 
   private
+
+  # The employee corrected a claim that was already with an approver (or approved):
+  # it is saved and sent to L1 again, and the approvals it had are cancelled.
+  def save_and_resend
+    TourClaim.transaction do
+      @claim.submitting = true
+      @claim.save!
+      @claim.resend_after_edit!(by: current_user)
+    end
+    redirect_to tours_path(type: @tour.tour_type),
+      notice: "Claim updated and sent again to L1 – #{@claim.l1_approver} for approval. Earlier approvals are cancelled."
+  rescue ActiveRecord::RecordInvalid
+    seed_rows
+    render :edit, status: :unprocessable_entity
+  end
 
   def save_and_maybe_submit
     TourClaim.transaction do
@@ -56,6 +73,20 @@ class TourClaimsController < ApplicationController
   rescue ActiveRecord::RecordInvalid
     seed_rows
     render :edit, status: :unprocessable_entity
+  end
+
+  # A Local Mileage month closes on the cutoff day of the next month (PD HR sets it,
+  # globally or per employee). After that the employee can neither fill nor send that
+  # month's claim – e.g. with cutoff day 5, an October claim is dead from 06-Nov.
+  # Claims the employee can no longer touch anyway are left alone: only the employee's
+  # own window closes.
+  def block_closed_local_month
+    return unless @tour.type_local? && @tour.claim_month
+    return if current_user.admin?   # admin may still correct an old month
+    return if @claim && !@claim.maker_editable?
+    period = LocalMileagePeriod.new(@tour.user)
+    return unless period.closed?(@tour.claim_month)
+    redirect_to tours_path(type: "local"), alert: period.closed_message(@tour.claim_month)
   end
 
   def set_tour

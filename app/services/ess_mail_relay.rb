@@ -34,11 +34,17 @@ class EssMailRelay
     "tour_returned" => "returned", "claim_returned" => "returned",
     "tour_rejected" => "rejected", "claim_rejected" => "rejected",
     "tour_cancelled" => "cancelled", "tour_deleted" => "deleted", "claim_closed" => "closed",
-    "tour_info" => "information", "claim_info" => "information", "claim_query_info" => "information"
+    "tour_info" => "information", "claim_info" => "information", "claim_query_info" => "information",
+    "circular_published" => "information", "claim_paid" => "approved"
   }.freeze
 
   def self.url = (ENV["ESS_MAIL_RELAY_URL"].presence || (Rails.env.production? ? DEFAULT_RELAY_URL : "")).to_s.strip
   def self.enabled? = url.present?
+  # Forgot-password mail must work even where ordinary notification mail is off (no ESS_MAIL_RELAY_URL outside
+  # production); ESS_PASSWORD_RESET_MAIL_RELAY_URL overrides. Ordinary notifications stay as they are.
+  def self.password_reset_url
+    ENV["ESS_PASSWORD_RESET_MAIL_RELAY_URL"].presence || url.presence || DEFAULT_RELAY_URL
+  end
   def self.app_url = (ENV["ESS_MAIL_APP_URL"].presence || DEFAULT_APP_URL).chomp("/")
 
   # Queues the mail for one notification; never raises.
@@ -84,21 +90,20 @@ class EssMailRelay
   end
 
   # Forgot password: one mail with the reset link (path is without the /pgpl prefix – app_url adds it).
-  def self.password_reset(user, path)
-    return false unless enabled?
-    EssMailJob.perform_later({
+  # Sent straight away, not queued, and through password_reset_url – so it also goes out where ordinary
+  # notification mail is switched off. Raising on failure is deliberate: the caller saves the new token
+  # only once krai has taken the mail, so a mail outage never kills a link the employee already has.
+  def self.password_reset!(user, path)
+    deliver!({
       "to_email" => user.email.to_s.strip, "to_name" => user.name.to_s,
       "subject" => "PGPL ESS: Reset your password",
       "message" => "A password reset was asked for Employee Code #{user.emp_code}. The link works once and only for 2 hours. " \
                    "If you did not ask for it, ignore this mail – your password stays the same",
       "link" => "#{app_url}#{path}", "employee_name" => user.name.to_s, "employee_code" => user.emp_code.to_s,
-      "quarter" => "", "month" => "", "reviewer_role" => "", "reviewer_name" => "", "action" => "information",
-      "remarks" => "", "mail_type" => "password_reset"
-    })
-    true
-  rescue StandardError => error
-    Rails.logger.error("EssMailRelay could not queue password reset for user=#{user.id}: #{error.class} #{error.message}")
-    false
+      "quarter" => "", "month" => "", "reviewer_role" => "", "reviewer_name" => "",
+      # krai accepts `pending` for a mail that needs the recipient to act
+      "action" => "pending", "remarks" => "", "mail_type" => "password_reset"
+    }, relay_url: password_reset_url)
   end
 
   # Notifier appends the remark as ' – “…”'; krai shows it in its own Remarks row
@@ -107,14 +112,16 @@ class EssMailRelay
     m ? [ m[1], m[2] ] : [ text, nil ]
   end
 
-  def self.request_uri(params)
-    uri = URI.parse(url)
+  def self.request_uri(params, relay_url: url)
+    uri = URI.parse(relay_url)
     uri.query = URI.encode_www_form(params.slice(*FIELDS))
     uri
   end
 
-  def self.deliver!(params)
-    response, final_uri = fetch(request_uri(params))
+  def self.deliver!(params, relay_url: url)
+    raise DeliveryError, "Mail relay URL is not configured" if relay_url.blank?
+
+    response, final_uri = fetch(request_uri(params, relay_url: relay_url))
     where = "[#{final_uri.scheme}://#{final_uri.host}#{final_uri.path}]"
     raise DeliveryError, "Mail service asked for a login #{where}" if final_uri.path.to_s.downcase.match?(/login|signin/)
     raise DeliveryError, "#{failure_message(response)} #{where}" unless success?(response)

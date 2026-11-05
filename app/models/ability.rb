@@ -29,6 +29,10 @@ class Ability
     can :create, Tour
     can :create, TourClaim, tour: { user_id: user.id }
     can [ :update, :submit ], TourClaim, user_id: user.id, status: %w[draft returned]
+    # The employee may also correct a claim that is already with an approver or approved –
+    # saving it cancels those approvals and sends it to L1 again (TourClaim#resend_after_edit!).
+    # A claim whose payment UTR is recorded is closed.
+    can :update, TourClaim, user_id: user.id, status: TourClaim::IN_PROCESS + [ "approved" ], utr_no: nil
     can :read,   TourClaim, l1_approver_id: user.id
     can :read,   TourClaim, l2_approver_id: user.id
     can :read,   TourClaim, approval_steps: { approver_id: user.id }
@@ -37,6 +41,7 @@ class Ability
     can :review, TourClaim do |c| c.current_reviewer?(user) end
 
     can :read, [ TravelMode, City, Project, BudgetLineItem, BudgetLineItemCode ]
+    can :read, Circular, active: true   # the controller also limits it to the ones addressed to them
 
     # --- bank details: own accounts; the claim's Finance person sees the account chosen on it
     can [ :read, :create, :update, :toggle, :make_primary ], BankAccount, user_id: user.id
