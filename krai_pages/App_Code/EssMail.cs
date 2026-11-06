@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
@@ -40,6 +41,8 @@ public static class EssMail
     {
         { "tour_pending",     new[] { "Tour plan waiting for your approval", Blue,   "Review in ESS" } },
         { "password_reset",   new[] { "Reset your ESS password",             Blue,   "Set a new password" } },
+        { "claim_paid",       new[] { "Payment made for your claim",         Green,  "Open ESS" } },
+        { "circular_published", new[] { "New IOM / Circular",                Blue,   "Open in ESS" } },
         { "tour_forwarded",   new[] { "Your tour plan was forwarded",        Blue,   "Open ESS" } },
         { "tour_approved",    new[] { "Tour plan approved",                  Green,  "Open ESS" } },
         { "tour_returned",    new[] { "Tour plan returned for correction",   Orange, "Correct and send again" } },
@@ -129,7 +132,7 @@ public static class EssMail
 
         html.Append("<tr><td style=\"padding:24px;font-size:15px;line-height:1.5;\">");
         html.Append("<p style=\"margin:0 0 12px;\">Dear ").Append(Enc(toName.Length > 0 ? toName : "Sir/Madam")).Append(",</p>");
-        if (message.Length > 0) html.Append("<p style=\"margin:0 0 16px;\">").Append(Enc(message)).Append("</p>");
+        if (message.Length > 0) html.Append("<p style=\"margin:0 0 16px;\">").Append(LinkEssUrls(Enc(message))).Append("</p>");
 
         html.Append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;border-collapse:collapse;font-size:14px;margin:0 0 20px;\">");
         foreach (KeyValuePair<string, string> row in rows.Where(r => r.Value.Length > 0))
@@ -226,6 +229,14 @@ public static class EssMail
     private static string Param(HttpRequest request, string name) { return (request.QueryString[name] ?? "").Trim(); }
     private static string OneLine(string value) { return value.Replace("\r", " ").Replace("\n", " ").Trim(); }
     private static string Enc(string value) { return HttpUtility.HtmlEncode(value ?? ""); }
+
+    // ESS links written in the message (e.g. IOM attachment downloads) become clickable – only links into ESS.
+    private static string LinkEssUrls(string encodedMessage)
+    {
+        string linkBase = Regex.Escape(Setting("EssLinkBase", DefaultLinkBase).TrimEnd('/'));
+        return Regex.Replace(encodedMessage, linkBase + @"/[^\s<|]*",
+            m => "<a href=\"" + m.Value + "\" style=\"color:#1d4ed8;\">" + m.Value + "</a>");
+    }
 
     private static string Setting(string key, string fallback)
     {

@@ -14,7 +14,7 @@
     </span>
   <% end %>
   <% if current_user.finance? && claim.project %><span><span class="text-xs font-semibold uppercase text-slate-400">Project</span> <%= claim.project %> · <%= claim.budget_line_item %> · <%= claim.budget_line_item_code %></span><% end %>
-  <span class="ml-auto"><%= status_badge(claim.status) %></span>
+  <span class="ml-auto"><%= claim_status_badge(claim) %></span>
 </div>
 
 <%# Payment account – visible to the employee and to this claim's Finance (PD Finance / admin) %>

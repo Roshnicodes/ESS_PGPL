@@ -39,6 +39,9 @@ class Tour < ApplicationRecord
   scope :claim_due,     ->(today = Date.current) { type_tour.approved.where(to_date: ...today).where.missing(:tour_claim) }
   scope :on_tour_between, ->(from, to) { approved.type_tour.where("from_date <= ? AND to_date >= ?", to, from) }
 
+  # "On tour today" page: every sent outstation plan covering the day – approved or still waiting for approval
+  scope :planned_on, ->(day) { type_tour.where(status: %w[submitted l1_approved l2_approved approved]).where("from_date <= :d AND to_date >= :d", d: day) }
+
   attr_accessor :send_now   # "Save & Send for Approval" vs plain "Save"
 
   validates :from_date, :to_date, presence: true

@@ -112,18 +112,18 @@ class TourClaimClarityTest < ActionDispatch::IntegrationTest
     assert_match %r{seal-top">TA/DA Claim<.*?seal-word">Not sent<}m, body
     assert_match "Tour plan history", body                             # plan and claim history kept apart
     assert_match "Claim history", body
-    assert_equal 2, body.scan('class="seal ').size
+    assert_equal 3, body.scan('class="seal ').size   # plan + claim stamps on screen, plan stamp beside the printed signatures
   end
 
-  test "All Tours lists pending first and only-saved last" do
-    emp = user("1025"); am = user("AM001")
-    saved = emp.tours.create!(from_date: Date.current - 30, to_date: Date.current - 29,
-      tour_visits_attributes: [ { visit_date: Date.current - 30, place: "Saved", planned_activity: "x" } ])
+  test "All Tours sorted 'Pending first' lists pending before only-saved" do
+    emp = user("1025")
     pending = emp.tours.create!(send_now: true, from_date: Date.current - 60, to_date: Date.current - 59,
       tour_visits_attributes: [ { visit_date: Date.current - 60, place: "Pending", planned_activity: "x" } ])
+    saved = emp.tours.create!(from_date: Date.current - 30, to_date: Date.current - 29,   # newer, but only saved
+      tour_visits_attributes: [ { visit_date: Date.current - 30, place: "Saved", planned_activity: "x" } ])
     assert saved.draft? && pending.submitted?
     sign_in user("ADMIN")
-    get masters_all_tours_path
+    get masters_all_tours_path(sort: "pending_first")
     assert_response :success
     assert response.body.index(tour_path(pending)) < response.body.index(tour_path(saved)), "pending tour must come before the saved one"
   end

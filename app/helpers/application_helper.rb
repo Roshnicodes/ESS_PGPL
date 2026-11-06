@@ -28,6 +28,9 @@ module ApplicationHelper
     status_badge(tour.status, label: label)
   end
 
+  # Claim badge (ESS uses it for lists; PGPL has no "Under process" step)
+  def claim_status_badge(claim, label: nil) = status_badge(claim.status, label: label)
+
   def status_badge(status, label: nil)
     tag.span(label || STATUS_LABELS.fetch(status.to_s, status.to_s.humanize), class: "badge badge-dot #{STATUS_COLORS[status.to_s]}")
   end
@@ -153,7 +156,7 @@ module ApplicationHelper
   end
 
   # Shown on screen and on the printed copy, at the foot of the document.
-  def approval_seal(record, css: nil)
+  def approval_seal(record, css: nil, top: nil)
     return "".html_safe if record.nil?
     word, tone = SEALS[record.status.to_s]
     return "".html_safe unless word
@@ -161,8 +164,8 @@ module ApplicationHelper
     tag.div(class: [ "seal", tone, css ]) do
       tag.div(class: "seal-ring") do
         tag.div(class: "seal-core") do
-          tag.div(seal_subject(record), class: "seal-top") +
-            tag.div(word, class: "seal-word") +
+          tag.div(top || seal_subject(record), class: "seal-top") +
+            tag.div(word, class: [ "seal-word", ("seal-word-long" if word.length > 9) ]) +
             (who.present? ? tag.div(who, class: "seal-line") : "".html_safe) +
             (at ? tag.div(d(at), class: "seal-line") : "".html_safe)
         end
