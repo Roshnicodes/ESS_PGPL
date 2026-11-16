@@ -2,6 +2,7 @@
 <% if tour.user_id == current_user.id %>
   <% if c.nil? && tour.claimable? %><%= link_to new_tour_claim_path(tour), class: "btn-primary btn-xs" do %><%= icon(:receipt) %> Make Claim<% end %>
   <% elsif c&.employee_editable? %><%= link_to edit_tour_claim_path(tour), class: "btn-primary btn-xs" do %><%= icon(:pencil) %> Edit Claim<% end %>
+    <%= link_to tour_claim_path(tour), class: "btn-light btn-xs", title: "View / print what is filled (no editing)" do %><%= icon(:printer) %> View / Print<% end %>
   <% elsif c&.reapproval_on_edit? %>
     <%# already sent / approved – the employee may still correct it, and it then goes to L1 again %>
     <%= link_to edit_tour_claim_path(tour), class: "btn-light btn-xs", title: "Correct the claim – it will be sent for approval again from L1" do %><%= icon(:pencil) %> Edit Claim<% end %>
