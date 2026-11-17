@@ -322,6 +322,21 @@ class Tour < ApplicationRecord
 
   def to_s = reference_no
 
+  # Still waiting at L1 and HR changed the employee's L-1 / L-2 → follow the new people (extra steps rebuilt,
+  # since none of them has acted yet). Anything already past L1 is left alone.
+  def follow_managers!(emp = user)
+    return unless type_tour? && submitted?
+    l1 = emp.reporting_manager_id || approver_id
+    l2 = emp.effective_l2_manager_id
+    return if l1 == approver_id && l2 == l2_approver_id
+    with_lock do
+      self.approver_id = l1
+      self.l2_approver_id = l2
+      assign_extra_steps
+      save!(validate: false)
+    end
+  end
+
   private
 
   def transition!(to, by:, remark:)

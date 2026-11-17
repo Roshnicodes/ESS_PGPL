@@ -54,6 +54,7 @@ class Masters::UsersController < ApplicationController
     changes = @user.changes.except("encrypted_password")
     if @user.save
       @user.log_activity!(:user_updated, details: changes) if changes.any?
+      @user.reassign_pending_l1_l2!   # also on a plain re-save: pending-at-L1 tours / claims catch up with L-1 / L-2
       redirect_to masters_users_path, notice: "Employee #{@user.emp_code} updated."
     else
       render :edit, status: :unprocessable_entity

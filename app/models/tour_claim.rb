@@ -230,6 +230,20 @@ class TourClaim < ApplicationRecord
     nxt || (finance_pending? || finance_query? ? nil : (user.finance_approver || finance_approver)&.name || "PD Finance")
   end
 
+  # Still waiting at L1 and HR changed the employee's L-1 / L-2 → follow the new people (see Tour#follow_managers!)
+  def follow_managers!(emp = user)
+    return unless submitted?
+    l1 = emp.reporting_manager_id || l1_approver_id
+    l2 = emp.effective_l2_manager_id
+    return if l1 == l1_approver_id && l2 == l2_approver_id
+    with_lock do
+      self.l1_approver_id = l1
+      self.l2_approver_id = l2
+      assign_extra_steps
+      save!(validate: false)
+    end
+  end
+
   def assign_extra_steps
     chain = ExtraApprovalChain.build(extra_needs, skip: [ user_id, l1_approver_id, l2_approver_id ])
     self.approval_steps = chain.each_with_index.map { |(uid, reason), i| ClaimApprovalStep.new(approver_id: uid, position: i + 1, reason: reason) }

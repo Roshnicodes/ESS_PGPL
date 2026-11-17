@@ -60,4 +60,16 @@ class ManagerChangeTest < ActionDispatch::IntegrationTest
     draft.approve!(by: @l1)
     assert draft.reload.approved?
   end
+
+  test "L-2 was set to None before this fix: a plain Save in the employee form removes the stale L2" do
+    waiting = new_tour(Date.current - 8)
+    @emp.update_columns(l2_manager_id: nil)            # like the live data: None saved, tour not updated
+    assert_equal @l2, waiting.reload.l2_approver
+
+    sign_in user("ADMIN")
+    patch masters_user_path(@emp), params: { user: { name: @emp.name } }
+    assert_nil waiting.reload.l2_approver_id
+    waiting.approve!(by: @l1)
+    assert waiting.reload.approved? || waiting.l2_approved?, "goes past L1 without an L2 step"
+  end
 end

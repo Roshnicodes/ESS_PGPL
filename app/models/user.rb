@@ -53,17 +53,12 @@ class User < ApplicationRecord
   # people (L-2 "None", or L-2 = L-1, means no L2 step – exactly as for a fresh send). Anything already past L1,
   # approved, or in the history stays as it was.
   def reassign_pending_l1_l2!
-    l2 = (l2_manager_id unless l2_manager_id.nil? || l2_manager_id == reporting_manager_id)
-    now = Time.current
-    tour_set  = { l2_approver_id: l2, updated_at: now }
-    claim_set = { l2_approver_id: l2, updated_at: now }
-    if reporting_manager_id
-      tour_set[:approver_id] = reporting_manager_id
-      claim_set[:l1_approver_id] = reporting_manager_id
-    end
-    tours.where(tour_type: "tour", status: "submitted").update_all(tour_set)
-    tour_claims.where(status: "submitted").update_all(claim_set)
+    tours.where(tour_type: "tour", status: "submitted").includes(:approval_steps, :tour_visits).find_each { |t| t.follow_managers!(self) }
+    tour_claims.where(status: "submitted").includes(:approval_steps).find_each { |c| c.follow_managers!(self) }
   end
+
+  # L2 for a new send: none when L-2 is "None" or the same person as L-1
+  def effective_l2_manager_id = (l2_manager_id unless l2_manager_id.nil? || l2_manager_id == reporting_manager_id)
 
   # ---- who sees the Approvals menus ------------------------------------------
   # L1 / L2 of anyone, L3 of a travel mode (e.g. Flight), or something is pending with / was approved by them
