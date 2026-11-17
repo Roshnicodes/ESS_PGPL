@@ -37,6 +37,7 @@ class User < ApplicationRecord
   validate  :manager_not_self
 
   after_update_commit :reassign_pending_finance_claims!, if: :saved_change_to_finance_approver_id?
+  after_update_commit :reassign_pending_l1_l2!, if: -> { saved_change_to_reporting_manager_id? || saved_change_to_l2_manager_id? }
 
   scope :active,  -> { where(active: true) }
   scope :ordered, -> { order(:name) }
@@ -46,6 +47,22 @@ class User < ApplicationRecord
     return if finance_approver_id.nil?
     tour_claims.where(status: "finance_pending").where.not(finance_approver_id: finance_approver_id)
                .update_all(finance_approver_id: finance_approver_id, updated_at: Time.current)
+  end
+
+  # HR changed this employee's L-1 / L-2 → tour plans and claims that are still waiting at L1 follow the new
+  # people (L-2 "None", or L-2 = L-1, means no L2 step – exactly as for a fresh send). Anything already past L1,
+  # approved, or in the history stays as it was.
+  def reassign_pending_l1_l2!
+    l2 = (l2_manager_id unless l2_manager_id.nil? || l2_manager_id == reporting_manager_id)
+    now = Time.current
+    tour_set  = { l2_approver_id: l2, updated_at: now }
+    claim_set = { l2_approver_id: l2, updated_at: now }
+    if reporting_manager_id
+      tour_set[:approver_id] = reporting_manager_id
+      claim_set[:l1_approver_id] = reporting_manager_id
+    end
+    tours.where(tour_type: "tour", status: "submitted").update_all(tour_set)
+    tour_claims.where(status: "submitted").update_all(claim_set)
   end
 
   # ---- who sees the Approvals menus ------------------------------------------

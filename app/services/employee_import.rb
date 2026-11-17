@@ -121,8 +121,10 @@ class EmployeeImport
         end
         fin ||= user.finance_approver_id unless row.key?(:finance_code) && row[:finance_code]
         next if l1 == user.reporting_manager_id && l2 == user.l2_manager_id && fin == user.finance_approver_id
+        managers_changed = l1 != user.reporting_manager_id || l2 != user.l2_manager_id
         user.update_columns(reporting_manager_id: l1, l2_manager_id: l2, finance_approver_id: fin, updated_at: Time.current)
         user.reassign_pending_finance_claims!
+        user.reassign_pending_l1_l2! if managers_changed
         res.managers_linked += 1
       end
     end

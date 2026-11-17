@@ -353,7 +353,8 @@ class Tour < ApplicationRecord
 
   def assign_approvers
     self.approver    = user.reporting_manager
-    self.l2_approver = user.l2_manager unless user.l2_manager_id.nil? || user.l2_manager_id == user.reporting_manager_id
+    # L-2 "None" (or same as L-1) → clear any L2 left from an earlier send, so L1 approval is final
+    self.l2_approver = (user.l2_manager unless user.l2_manager_id.nil? || user.l2_manager_id == user.reporting_manager_id)
     assign_extra_steps
   end
 
