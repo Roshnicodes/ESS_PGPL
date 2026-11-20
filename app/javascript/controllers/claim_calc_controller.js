@@ -34,11 +34,19 @@ export default class extends Controller {
     const q = (k) => row.querySelector(`[data-calc="${k}"]`)
     const changed = event?.target && row.contains(event.target) ? event.target.dataset.calc : null
     const amountEl = q("amount")
-    const deduction = this.num(q("deduction")?.dataset.value)
-
-    // "NA" mode = no journey on this line: ticket / meters / KM / purpose / amount are not needed – cleared and locked
+    // "NA" mode = no journey on this line: ticket / meters / KM / purpose / amount / deduction are not needed – cleared and locked
     const na = q("mode")?.selectedOptions[0]?.dataset.na === "true"
     row.querySelectorAll("[data-calc='na_clear']").forEach((el) => { if (na) el.value = ""; el.readOnly = na })
+
+    const dedEl = q("deduction"), dedRemark = q("deduction_remark")
+    if (dedEl && dedEl.dataset.value === undefined) {   // editable deduction box (claim form)
+      if (na) { dedEl.value = ""; if (dedRemark) dedRemark.value = "" }
+      dedEl.readOnly = na
+      if (dedRemark) dedRemark.readOnly = na
+    }
+    const deduction = this.num(dedEl?.value ?? dedEl?.dataset.value)
+    // a deduction needs its reason (the server checks it too)
+    if (dedRemark && !na) dedRemark.required = deduction > 0
     if (kind === "city") {
       if (na) amountEl.value = ""
       amountEl.readOnly = na
